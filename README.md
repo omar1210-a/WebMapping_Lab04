@@ -1,1 +1,3 @@
 # WebMapping_Lab04
+
+For this assignment, my file structure looks different because I had to move all of my web files into a /docs folder. GitHub Pages was not detecting or publishing the site when the files were in the root directory, even though the repository was public and set to deploy from the main branch. This is a common issue with GitHub Pages, and the standard workaround is to place the website files inside a /docs folder so GitHub can properly build and host the site. After moving index.html, the assets folder, and the other HTML files into /docs, the site published successfully. Therefore, although the expected format is to have files in the main directory, my project uses a /docs folder so that GitHub Pages can deploy the webpage correctly.
