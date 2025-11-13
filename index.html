@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>COVID-19 Case Rate in Washington Counties (per 10,000 people)</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+
+    <!-- Mapbox CSS/JS -->
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.5.0/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.5.0/mapbox-gl.js"></script>
+
+    <style>
+        h2, h3 {
+            margin: 10px;
+            font-size: 18px;
+        }
+
+        h3 {
+            font-size: 16px;
+        }
+
+        p {
+            margin: 10px;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            width: 100%;
+        }
+
+        .map-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            background: rgba(255, 255, 255, 0.9);
+            border-style: solid;
+            border-width: 1px;
+            border-color: rgba(0, 0, 0, 0.2);
+            margin-left: 20px;
+            font-family: Arial, sans-serif;
+            overflow: auto;
+            border-radius: 3px;
+        }
+
+        #features {
+            top: 0;
+            height: 120px;
+            margin-top: 20px;
+            width: 320px;
+        }
+
+        #legend {
+            padding: 10px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+            line-height: 18px;
+            height: 230px;
+            margin-bottom: 40px;
+            width: 220px;
+        }
+
+        .legend-key {
+            display: inline-block;
+            border-radius: 20%;
+            width: 12px;
+            height: 12px;
+            margin-right: 5px;
+        }
+
+        .mapboxgl-canvas-container.mapboxgl-interactive,
+        .mapboxgl-ctrl-group button.mapboxgl-ctrl-compass {
+            cursor: unset;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+
+    <div class="map-overlay" id="features">
+        <h2>COVID-19 Case Rate in Washington Counties</h2>
+        <p style="margin-top:0; margin-bottom:5px; font-size:13px; color:#555;">
+            Cumulative confirmed cases per 10,000 people (as of Oct. 25, 2021)
+        </p>
+        <div id="text-description">
+            <p>Hover over a county to see details.</p>
+        </div>
+    </div>
+
+    <div class="map-overlay" id="legend"></div>
+
+    <script>
+        mapboxgl.accessToken = 'pk.eyJ1Ijoib21hcjEyMTAtYSIsImEiOiJjbWhjZWJzNG4xOWtxMmtwenJpbTF5MmZmIn0.ugxCVu9XTQNmM11fhRmDeg';
+
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/light-v10',
+            zoom: 6.2,
+            center: [-120.5, 47.4] // Washington State
+        });
+
+        map.on('load', async () => {
+            // Load WA COVID-19 data
+            const response = await fetch('assets/wa-covid-data-102521.geojson');
+            const waCovidData = await response.json();
+
+            // Add source
+            map.addSource('waCovidData', {
+                type: 'geojson',
+                data: waCovidData
+            });
+
+            // Choropleth based on casePer10k
+            map.addLayer({
+                'id': 'waCovid-layer',
+                'type': 'fill',
+                'source': 'waCovidData',
+                'paint': {
+                    'fill-color': [
+                        'step',
+                        ['get', 'casePer10k'],
+                        '#f7fbff',   // < 500
+                        500,  '#deebf7', // 500–999
+                        1000, '#c6dbef', // 1000–1499
+                        1500, '#9ecae1', // 1500–1999
+                        2000, '#6baed6', // 2000–2499
+                        2500, '#4292c6', // 2500–2999
+                        3000, '#2171b5', // 3000–3499
+                        3500, '#084594'  // 3500+
+                    ],
+                    'fill-outline-color': '#bbbbbb',
+                    'fill-opacity': 0.8
+                }
+            });
+
+            // Legend
+            const layers = [
+                '< 500',
+                '500 – 999',
+                '1000 – 1499',
+                '1500 – 1999',
+                '2000 – 2499',
+                '2500 – 2999',
+                '3000 – 3499',
+                '3500 and above'
+            ];
+
+            const colors = [
+                '#f7fbffcc',
+                '#deebf7cc',
+                '#c6dbefcc',
+                '#9ecae1cc',
+                '#6baed6cc',
+                '#4292c6cc',
+                '#2171b5cc',
+                '#084594cc'
+            ];
+
+            const legend = document.getElementById('legend');
+            legend.innerHTML = "<b>Cumulative COVID-19 Case Rate<br>(per 10,000 people)</b><br><br>";
+
+            layers.forEach((layer, i) => {
+                const color = colors[i];
+                const item = document.createElement('div');
+                const key = document.createElement('span');
+                key.className = 'legend-key';
+                key.style.backgroundColor = color;
+
+                const value = document.createElement('span');
+                value.innerHTML = layer;
+                item.appendChild(key);
+                item.appendChild(value);
+                legend.appendChild(item);
+            });
+
+            // Hover interaction
+            map.on('mousemove', (event) => {
+                const county = map.queryRenderedFeatures(event.point, {
+                    layers: ['waCovid-layer']
+                });
+
+                const desc = document.getElementById('text-description');
+                if (county.length) {
+                    const props = county[0].properties;
+
+                    // props.casePer10k, props.deathPer10k, props.fullyVaxPer10k
+                    desc.innerHTML =
+                        `<h3>${props.name} County</h3>` +
+                        `<p><strong>${props.casePer10k}</strong> cases per 10,000 people<br>` +
+                        `<strong>${props.deathPer10k}</strong> deaths per 10,000 people<br>` +
+                        `<strong>${props.fullyVaxPer10k}</strong> fully vaccinated per 10,000 people</p>`;
+                } else {
+                    desc.innerHTML = `<p>Hover over a county to see details.</p>`;
+                }
+            });
+        });
+    </script>
+</body>
+</html>
